@@ -95,7 +95,8 @@ npm install
 npm run dev
 ```
 
-Abrir http://localhost:5173
+Abrir http://localhost:5173 (la app abre en `/` con la pantalla de carga y
+avanza a la bienvenida).
 
 Otros comandos:
 
@@ -113,20 +114,26 @@ npm run lint
 
 - Estructura de carpetas de todo el proyecto.
 - Frontend React + TypeScript (estricto) + Vite + React Router.
-- Diseño mobile-first con identidad visual (crema, rojo, tarjetas blancas).
-- Navegacion inferior y 11 pantallas de interfaz.
+- Diseño mobile-first con identidad visual (crema, rojo, tarjetas blancas,
+  tipografia Nunito, motivo de montanas y cenefa andina sutiles).
+- 16 pantallas: splash, onboarding, login, registro y las 12 pantallas de la app.
+- Navegacion inferior (Inicio / Conversacion / Historial / Perfil).
+- Componente de mascota/logo con marcador SVG hasta cargar la imagen real
+  (`frontend/src/assets/mascot/`).
 - Datos de ejemplo (mock) marcados como DEMO.
 - Lectura por voz mediante la Web Speech API del navegador.
+- Ajuste de tamano de texto que si afecta a toda la app.
 
 ### **No** implementado todavia
 
+- Autenticacion real (login y registro son de demostracion).
 - Acceso real a la camara.
 - MediaPipe y extraccion de landmarks.
 - Dataset y modelo de IA / reconocimiento de señas.
 - Backend FastAPI y endpoints.
 - Base de datos PostgreSQL.
 - Avatar 3D (Three.js) y animaciones de LSP.
-- Persistencia de perfil, historial y preferencias.
+- Persistencia de perfil, historial y la mayoria de preferencias.
 
 Las equivalencias texto ↔ seña mostradas en la app son **demostrativas** y no
 han sido validadas con personas usuarias de LSP ni interpretes.
