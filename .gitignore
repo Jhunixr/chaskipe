@@ -1,0 +1,80 @@
+# ---------- Node / Frontend ----------
+node_modules/
+dist/
+dist-ssr/
+build/
+*.local
+.vite/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------- Python / Backend / IA ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+env/
+ENV/
+
+# ---------- Variables de entorno ----------
+.env
+.env.*
+!.env.example
+
+# ---------- Modelos y datos pesados ----------
+# El dataset y los modelos entrenados no se versionan (ver ai/README.md)
+ai/data/raw/*
+ai/data/processed/*
+!ai/data/raw/.gitkeep
+!ai/data/processed/.gitkeep
+ai/models/*
+!ai/models/.gitkeep
+*.h5
+*.keras
+*.tflite
+*.onnx
+*.pt
+*.pth
+*.pkl
+*.joblib
+
+# ---------- Avatar / activos 3D pesados ----------
+avatar/exports/*
+!avatar/exports/.gitkeep
+*.blend1
+*.blend2
+
+# ---------- Base de datos ----------
+*.sqlite
+*.sqlite3
+*.db
+
+# ---------- Archivos temporales ----------
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# ---------- Editor / IDE ----------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+
+# ---------- Sistema operativo ----------
+.DS_Store
+Thumbs.db
+desktop.ini
