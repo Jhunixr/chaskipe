@@ -1,10 +1,10 @@
-"""Endpoints del historial de traducciones (FASE 7)."""
+"""Endpoints del historial de traducciones (FASE 8)."""
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.schemas.history import HistoryEntry, HistoryEntryCreate
-from app.services.store import store
+from app.services.store import get_repository
 
 router = APIRouter(prefix="/history", tags=["history"])
 
@@ -13,17 +13,17 @@ router = APIRouter(prefix="/history", tags=["history"])
 def list_history(
     limit: int | None = Query(default=None, ge=1, le=200),
 ) -> list[HistoryEntry]:
-    return store.list_history(limit=limit)
+    return get_repository().list_history(limit=limit)
 
 
 @router.post("", response_model=HistoryEntry, status_code=status.HTTP_201_CREATED)
 def add_history(data: HistoryEntryCreate) -> HistoryEntry:
-    return store.add_history(data)
+    return get_repository().add_history(data)
 
 
 @router.delete("/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_history(entry_id: str) -> None:
-    if not store.delete_history(entry_id):
+    if not get_repository().delete_history(entry_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Entrada de historial no encontrada",
@@ -32,4 +32,4 @@ def delete_history(entry_id: str) -> None:
 
 @router.delete("", status_code=status.HTTP_200_OK)
 def clear_history() -> dict[str, int]:
-    return {"deleted": store.clear_history()}
+    return {"deleted": get_repository().clear_history()}

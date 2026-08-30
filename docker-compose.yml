@@ -1,0 +1,29 @@
+# Base de datos de Chaski Pe (FASE 8).
+#
+#   docker compose up -d db      # levantar
+#   docker compose down          # detener (conserva los datos)
+#   docker compose down -v       # detener y BORRAR los datos
+#
+# La API se conecta con:
+#   CHASKIPE_DATABASE_URL=postgresql+psycopg://chaskipe:chaskipe@localhost:5432/chaskipe
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: chaskipe-db
+    environment:
+      POSTGRES_USER: chaskipe
+      POSTGRES_PASSWORD: chaskipe
+      POSTGRES_DB: chaskipe
+    ports:
+      - "5432:5432"
+    volumes:
+      - chaskipe-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chaskipe -d chaskipe"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  chaskipe-db-data:

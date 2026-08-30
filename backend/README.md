@@ -1,53 +1,73 @@
 # Backend — Chaski Pe
 
-> Estado: **FASE 7 — API REST con persistencia EN MEMORIA**.
-> La base de datos real (PostgreSQL) es la FASE 8.
+> Estado: **FASE 8 — PostgreSQL** (SQLAlchemy + Alembic).
+> Si la base de datos no responde, la API cae a persistencia **en memoria**
+> y lo avisa en `/health`.
 
 ## Tecnologias
 
 - **Python 3.11 / 3.12**
 - **FastAPI** + **Uvicorn**
 - **Pydantic v2**
+- **SQLAlchemy 2.0** + **Alembic** (migraciones)
+- **PostgreSQL 16** (contenedor Docker)
 
 ## Arquitectura
 
 ```
-React  →  FastAPI  →  (FASE 8: PostgreSQL)
+React  →  FastAPI  →  PostgreSQL   (con fallback a memoria)
 ```
 
-El frontend **no** se conecta a la base de datos. En la FASE 7 el backend guarda
-todo en memoria (`app/services/store.py`); esa capa se reemplazara por un
-repositorio contra PostgreSQL manteniendo la misma interfaz.
+El frontend **no** se conecta a la base de datos. El backend usa un
+**repositorio** (`app/services/repository.py`) con dos implementaciones:
+`SqlRepository` (PostgreSQL) y `MemoryRepository` (fallback). `configure_repository()`
+elige una al arrancar.
 
-- **Sin autenticacion** todavia (un unico usuario).
-- **Sin endpoint de inferencia**: el modelo de reconocimiento corre en el
-  navegador (FASE 5/6).
+- **Sin autenticacion** todavia (un unico usuario, id=1).
+- **Sin endpoint de inferencia**: el modelo corre en el navegador.
 
-## Instalacion y ejecucion
+## Puesta en marcha
+
+### 1. Base de datos (Docker)
+
+```bash
+# desde la raiz del repo
+docker compose up -d db
+```
+
+### 2. Backend
 
 ```bash
 cd backend
 py -m venv .venv
 .venv\Scripts\activate            # Windows   (source .venv/bin/activate en Unix)
 pip install -r requirements.txt
+alembic upgrade head              # aplica el esquema
 uvicorn app.main:app --reload
 ```
 
-- API: http://127.0.0.1:8000
-- Docs interactivas: http://127.0.0.1:8000/docs
-- Healthcheck: http://127.0.0.1:8000/health
+- API: http://127.0.0.1:8000 · Docs: http://127.0.0.1:8000/docs
+- `GET /health` -> `persistence` es `postgresql` o `memory`
+
+Sin Docker/PostgreSQL el backend igual arranca (persistencia en memoria).
 
 ## Estructura
 
 ```
 backend/
 ├── app/
-│   ├── main.py            # FastAPI, CORS, /health, routers
-│   ├── api/               # profile.py, history.py, phrases.py
-│   ├── schemas/           # modelos Pydantic (entrada/salida)
-│   ├── services/store.py  # almacen EN MEMORIA (semilla incluida)
-│   └── core/config.py     # settings (env CHASKIPE_*)
-├── tests/                 # pytest (TestClient)
+│   ├── main.py             # FastAPI, CORS, /health, lifespan
+│   ├── api/                # profile.py, history.py, phrases.py
+│   ├── schemas/            # modelos Pydantic (entrada/salida)
+│   ├── db/base.py          # modelos SQLAlchemy + engine
+│   ├── services/
+│   │   ├── repository.py   # MemoryRepository + SqlRepository + semilla
+│   │   └── store.py        # seleccion del repositorio
+│   └── core/config.py      # settings (env CHASKIPE_*)
+├── alembic/                # migraciones
+│   └── versions/
+├── tests/                  # pytest
+├── alembic.ini
 └── requirements.txt
 ```
 
@@ -57,12 +77,29 @@ backend/
 | ------ | ---- | ----------- |
 | GET    | `/profile` | Perfil del usuario |
 | PUT    | `/profile` | Actualiza nombre y correo |
-| GET    | `/history` | Historial (orden reciente-primero; `?limit=N`) |
+| GET    | `/history` | Historial (`?limit=N`) |
 | POST   | `/history` | Anade una entrada |
 | DELETE | `/history/{id}` | Borra una entrada (404 si no existe) |
 | DELETE | `/history` | Vacia el historial |
 | GET    | `/phrases` | Frases rapidas por categoria |
-| GET    | `/health` | Estado del servicio (sin prefijo) |
+| GET    | `/health` | Estado + tipo de persistencia (sin prefijo) |
+
+## Configuracion (variables de entorno)
+
+| Variable | Por defecto | |
+| -------- | ----------- | --- |
+| `CHASKIPE_DATABASE_URL` | `postgresql+psycopg://chaskipe:chaskipe@localhost:5432/chaskipe` | URL de la BD |
+| `CHASKIPE_REQUIRE_DATABASE` | `false` | si `true`, el backend falla al arrancar sin BD |
+| `CHASKIPE_ENVIRONMENT` | `development` | |
+
+## Migraciones (Alembic)
+
+```bash
+alembic upgrade head                       # aplicar todas
+alembic revision --autogenerate -m "..."   # crear una tras cambiar los modelos
+alembic downgrade -1                        # revertir la ultima
+alembic current                             # version aplicada
+```
 
 ## Pruebas
 
@@ -72,15 +109,18 @@ cd backend
 pytest -q
 ```
 
+Los tests de la API corren contra el repositorio **en memoria** (rapido, sin BD).
+`test_persistence.py` prueba la seleccion de repositorio y, si hay PostgreSQL
+disponible, la integracion real (si no, se salta).
+
 ## Notas de datos
 
-- Todo lo relacionado con senas LSP viaja con `is_demo: true`: no esta validado
-  con personas usuarias de LSP ni interpretes.
-- Los datos semilla (perfil "Andersson", 3 entradas de historial, frases) son de
-  ejemplo y se reinician al reiniciar el proceso.
+- Todo lo relacionado con senas LSP viaja con `is_demo: true` / `es_demo=true`:
+  no esta validado con personas usuarias de LSP ni interpretes.
+- Los datos semilla (perfil "Andersson", 3 entradas de historial, frases) se
+  insertan solo si las tablas estan vacias.
 
-## Pendiente (FASE 8)
+## Pendiente
 
-- [ ] Modelos SQLAlchemy + migraciones (Alembic).
-- [ ] Reemplazar `MemoryStore` por un repositorio contra PostgreSQL.
-- [ ] Autenticacion / usuarios.
+- [ ] Autenticacion / usuarios (varios perfiles).
+- [ ] `preferencias_usuario`, catalogo de `senas`, `animaciones_sena`.

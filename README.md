@@ -3,8 +3,8 @@
 Aplicacion inclusiva para facilitar la comunicacion entre personas usuarias de
 **Lengua de Señas Peruana (LSP)** y personas oyentes.
 
-> **Estado actual: FASE 7 (backend FastAPI: perfil, historial, frases).**
-> Persistencia en memoria; el modelo de reconocimiento es de prueba.
+> **Estado actual: FASE 8 (PostgreSQL: perfil, historial y frases persistentes).**
+> El modelo de reconocimiento sigue siendo de prueba (datos sinteticos).
 > Ver [Estado actual](#estado-actual).
 
 ---
@@ -59,12 +59,12 @@ El dataset de IA vive en `ai/data/`, **no** en la base de datos.
 | Area          | Stack                                        |
 | ------------- | -------------------------------------------- |
 | Frontend      | React, TypeScript, Vite, React Router, CSS   |
-| Backend       | Python, FastAPI *(futuro)*                   |
-| IA            | Python, MediaPipe *(futuro)*                 |
-| Base de datos | PostgreSQL *(futuro)*                        |
+| Backend       | Python, FastAPI, SQLAlchemy, Alembic         |
+| IA            | Python, MediaPipe, TensorFlow/Keras (entreno) |
+| Base de datos | PostgreSQL 16 (Docker)                       |
 | Avatar        | Blender, Three.js, GLB/glTF *(futuro)*       |
 | Control de versiones | Git                                  |
-| Gestor de paquetes   | npm                                  |
+| Gestor de paquetes   | npm, pip                             |
 
 ---
 
@@ -114,19 +114,25 @@ npm run lint
 
 ## Como ejecutar el backend (opcional)
 
-Requisitos: Python 3.11 o 3.12.
+Requisitos: Python 3.11 o 3.12, y Docker (para PostgreSQL).
 
 ```bash
+# 1. Base de datos (desde la raiz del repo)
+docker compose up -d db
+
+# 2. Backend
 cd backend
 py -m venv .venv
 .venv\Scripts\activate            # Windows
 pip install -r requirements.txt
+alembic upgrade head              # crea el esquema
 uvicorn app.main:app --reload
 ```
 
 - API: http://127.0.0.1:8000 · Docs: http://127.0.0.1:8000/docs
-- Persistencia **en memoria** (se pierde al reiniciar). PostgreSQL es la FASE 8.
-- Si no lo levantas, el frontend usa datos de ejemplo.
+- Persistencia en **PostgreSQL**. Sin Docker/BD el backend igual arranca
+  (persistencia en memoria); `GET /health` indica cual esta en uso.
+- Si no levantas el backend, el frontend usa datos de ejemplo.
 
 ---
 
@@ -192,20 +198,25 @@ uvicorn app.main:app --reload
 
 - API REST (`backend/`, FastAPI + Uvicorn): perfil (GET/PUT), historial
   (GET/POST/DELETE), frases rapidas (GET), `/health`, `/docs`.
-- Persistencia **en memoria** (`app/services/store.py`). PostgreSQL es la FASE 8.
-- Sin autenticacion. Sin endpoint de inferencia (el modelo corre en el navegador).
 - El frontend conecta con **fallback a mock**: funciona con o sin backend
   (`VITE_API_URL`, `src/services/api.ts`).
-- 12 pruebas (`pytest`); integracion verificada en el navegador.
+
+**FASE 8 — PostgreSQL**
+
+- Persistencia real en **PostgreSQL 16** (Docker, `docker-compose.yml`).
+- SQLAlchemy 2.0 (`app/db/base.py`) + Alembic (`backend/alembic/`).
+- Patron repositorio: `SqlRepository` con **fallback a `MemoryRepository`** si
+  la BD no responde; `/health` indica cual esta activo.
+- Tablas: `usuarios`, `frases`, `historial_traduccion` (+ semilla).
+- El perfil y el historial **sobreviven al reinicio del backend**.
+- 15 pruebas (`pytest`), incluye integracion real con PostgreSQL.
 
 ### **No** implementado todavia
 
 - **El modelo no reconoce senas reales** — entrenado con datos sinteticos de
   prueba. La pantalla lo avisa.
 - Muestras reales del dataset.
-- Persistencia real: al reiniciar el backend se pierden los cambios (FASE 8).
-- Autenticacion real (login y registro son de demostracion).
-- Base de datos PostgreSQL.
+- Autenticacion real (login y registro son de demostracion); un unico usuario.
 - Avatar 3D (Three.js) y animaciones de LSP.
 - Pose y rostro (MediaPipe) — solo manos por ahora.
 
@@ -223,9 +234,9 @@ han sido validadas con personas usuarias de LSP ni interpretes.
 | 3    | MediaPipe                                   | Hecho       |
 | 4    | Dataset                                     | Hecho       |
 | 5    | Modelo de IA                                | Hecho (con datos sinteticos) |
-| 6    | Integracion del modelo                      | Hecho       |
-| 7    | Backend FastAPI                             | **Actual** (persistencia en memoria) |
-| 8    | PostgreSQL                                  | Pendiente   |
+| 6    | Integracion del modelo                      | Hecho (tiempo real) |
+| 7    | Backend FastAPI                             | Hecho       |
+| 8    | PostgreSQL                                  | **Actual**  |
 | 9    | Avatar 3D                                   | Pendiente   |
 | 10   | Animaciones LSP validadas                   | Pendiente   |
 | 11   | Integracion completa                        | Pendiente   |

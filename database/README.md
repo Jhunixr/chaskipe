@@ -1,10 +1,11 @@
 # Base de datos — Chaski Pe
 
-> Estado: **no iniciado**. Carpeta preparada para fases futuras.
+> Estado: **FASE 8 — PostgreSQL en uso** (perfil, historial, frases).
+> El esquema y las migraciones viven en `backend/` (SQLAlchemy + Alembic).
 
-## Motor previsto
+## Motor
 
-- **PostgreSQL**
+- **PostgreSQL 16** (contenedor Docker, ver `../docker-compose.yml`).
 
 ## Arquitectura
 
@@ -14,41 +15,60 @@ React **no** se conecta directamente a PostgreSQL:
 React  →  FastAPI  →  PostgreSQL
 ```
 
-## Estructura
+Si PostgreSQL no responde, el backend cae a persistencia **en memoria** y lo
+avisa en `/health` (`persistence: memory`).
 
+## Levantar / detener
+
+```bash
+# desde la raiz del repo
+docker compose up -d db      # levantar
+docker compose down          # detener (conserva los datos)
+docker compose down -v       # detener y BORRAR los datos
 ```
-database/
-├── migrations/   # cambios de esquema versionados
-├── seeds/        # datos iniciales (catalogos, frases base)
-└── README.md
+
+Datos de conexion (por defecto):
+`postgresql+psycopg://chaskipe:chaskipe@localhost:5432/chaskipe`
+
+Se puede cambiar con `CHASKIPE_DATABASE_URL` (variable de entorno del backend).
+
+## Esquema y migraciones
+
+Definidos en el backend con **SQLAlchemy 2.0** (`backend/app/db/base.py`) y
+**Alembic** (`backend/alembic/`).
+
+```bash
+cd backend
+.venv\Scripts\activate
+alembic upgrade head                       # aplicar migraciones
+alembic revision --autogenerate -m "..."   # nueva migracion tras cambiar modelos
+alembic downgrade -1                        # revertir la ultima
 ```
 
-> Todavia **no** existe un `schema.sql` definitivo.
+> Al arrancar, el backend tambien hace `create_all()` (crea las tablas que
+> falten). Alembic es el metodo recomendado para cambios de esquema.
 
-## Entidades futuras (borrador)
+## Entidades (FASE 8)
 
-| Entidad              | Proposito                                              |
-| -------------------- | ----------------------------------------------------- |
-| `usuarios`           | Cuentas de la aplicacion                              |
-| `preferencias_usuario` | Accesibilidad y ajustes por usuario                 |
-| `senas`              | Catalogo de señas LSP validadas                       |
-| `frases`             | Frases rapidas por categoria                          |
-| `frase_sena`         | Relacion N:M entre frases y señas                     |
-| `animaciones_sena`   | Referencia a los clips de avatar por seña             |
-| `historial_traduccion` | Registro de traducciones (con consentimiento)       |
+| Tabla                  | Contenido |
+| ---------------------- | --------- |
+| `usuarios`             | Perfil (nombre, correo). Un unico usuario (id=1) por ahora. |
+| `frases`               | Frases rapidas por categoria. `es_demo=true` (senas no validadas). |
+| `historial_traduccion` | Traducciones: direccion, texto, fecha, `es_demo`. |
+| `alembic_version`      | Control de versiones de Alembic. |
+
+### Entidades futuras (aun no creadas)
+
+`preferencias_usuario`, `senas`, `frase_sena`, `animaciones_sena` — se anaden
+cuando haya avatar y modelo de IA con senas validadas.
 
 ## Consideraciones importantes
 
 - El **dataset de entrenamiento de IA no** se guarda en PostgreSQL.
   Vive en `../ai/data/raw/` y `../ai/data/processed/`.
 - No se guardan videos de personas sin consentimiento explicito.
-- Las señas del catalogo deben estar validadas con personas usuarias de LSP o
-  interpretes antes de marcarse como definitivas.
-
-## Pendiente
-
-- [ ] Definir `schema.sql` inicial.
-- [ ] Elegir herramienta de migraciones (Alembic u otra).
-- [ ] Crear seeds de frases base.
-
-Nada de esto se implementa en la FASE 1.
+- Las senas del catalogo (futura tabla `senas`) deben estar validadas con
+  personas usuarias de LSP o interpretes antes de marcarse como definitivas.
+- Las carpetas `migrations/` y `seeds/` de aqui quedan como referencia; las
+  migraciones reales estan en `backend/alembic/versions/` y la semilla en
+  `backend/app/services/repository.py`.

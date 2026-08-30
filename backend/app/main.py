@@ -1,5 +1,5 @@
 """
-Punto de entrada de la API de Chaski Pe (FASE 7).
+Punto de entrada de la API de Chaski Pe (FASE 8).
 
     cd backend
     .venv\\Scripts\\activate
@@ -7,23 +7,38 @@ Punto de entrada de la API de Chaski Pe (FASE 7).
 
 Docs interactivas: http://127.0.0.1:8000/docs
 
-Alcance FASE 7:
+Alcance FASE 8:
 - Perfil, historial y frases rapidas.
-- Persistencia EN MEMORIA (se pierde al reiniciar). PostgreSQL es la FASE 8.
+- Persistencia en **PostgreSQL** (SQLAlchemy). Si la base de datos no responde,
+  la API cae a persistencia EN MEMORIA y lo avisa en /health.
 - Sin autenticacion. Sin endpoint de inferencia (el modelo corre en el navegador).
+
+Base de datos:
+    docker compose up -d db      (desde la raiz del repo)
 """
 from __future__ import annotations
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import history, phrases, profile
 from app.core.config import settings
+from app.services import store
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    store.configure_repository()
+    yield
+
 
 app = FastAPI(
     title=settings.app_name,
     version=settings.version,
     summary="API de perfil, historial y frases rapidas de Chaski Pe.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -42,7 +57,7 @@ def health() -> dict[str, str]:
         "service": settings.app_name,
         "version": settings.version,
         "environment": settings.environment,
-        "persistence": settings.persistence,
+        "persistence": store.current_backend(),
     }
 
 

@@ -1,153 +1,60 @@
 """
-Almacen en memoria (FASE 7).
+Seleccion del repositorio de datos (FASE 8).
 
-Todo vive en variables de proceso: se pierde al reiniciar. La base de datos
-real (PostgreSQL) es la FASE 8; esta capa se reemplazara por un repositorio
-contra la BD manteniendo la misma interfaz.
+Al arrancar la app (`app.main.lifespan`) se llama a `configure_repository()`:
+- si PostgreSQL responde -> `SqlRepository` (crea tablas y semilla)
+- si no -> `MemoryRepository` (fallback), avisado en /health
 
-FASE 7 asume un unico usuario (no hay autenticacion todavia).
+Los endpoints usan `get_repository()`.
 """
 from __future__ import annotations
 
-import threading
-import uuid
-from datetime import datetime, timezone
+from app.core.config import settings
+from app.db import base as db
+from app.services.repository import (
+    MemoryRepository,
+    Repository,
+    SqlRepository,
+    seed_database,
+)
 
-from app.schemas.history import HistoryEntry, HistoryEntryCreate
-from app.schemas.phrases import QuickPhrase, QuickPhraseGroup
-from app.schemas.profile import Profile
-
-_lock = threading.Lock()
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
+_repository: Repository = MemoryRepository()
+_backend: str = "memory"
 
 
-class MemoryStore:
-    """Estado del proceso. Una instancia global: `store`."""
-
-    def __init__(self) -> None:
-        self._profile = Profile(name="Andersson", email="andersson@example.pe")
-        self._history: list[HistoryEntry] = []
-        self._phrase_groups = _seed_phrases()
-        self._seed_history()
-
-    # ---- Perfil ----
-    def get_profile(self) -> Profile:
-        with _lock:
-            return self._profile.model_copy()
-
-    def update_profile(self, name: str, email: str) -> Profile:
-        with _lock:
-            self._profile = Profile(name=name, email=email)
-            return self._profile.model_copy()
-
-    # ---- Historial ----
-    def list_history(self, limit: int | None = None) -> list[HistoryEntry]:
-        with _lock:
-            items = sorted(
-                self._history, key=lambda e: e.created_at, reverse=True
-            )
-            return items[:limit] if limit else list(items)
-
-    def add_history(self, data: HistoryEntryCreate) -> HistoryEntry:
-        with _lock:
-            entry = HistoryEntry(
-                id=uuid.uuid4().hex[:12],
-                created_at=_now(),
-                **data.model_dump(),
-            )
-            self._history.append(entry)
-            return entry
-
-    def delete_history(self, entry_id: str) -> bool:
-        with _lock:
-            before = len(self._history)
-            self._history = [e for e in self._history if e.id != entry_id]
-            return len(self._history) < before
-
-    def clear_history(self) -> int:
-        with _lock:
-            n = len(self._history)
-            self._history = []
-            return n
-
-    # ---- Frases rapidas ----
-    def list_phrase_groups(self) -> list[QuickPhraseGroup]:
-        with _lock:
-            return [g.model_copy(deep=True) for g in self._phrase_groups]
-
-    # ---- Utilidad para tests ----
-    def reset(self) -> None:
-        with _lock:
-            self.__init__()  # type: ignore[misc]
-
-    def _seed_history(self) -> None:
-        seed = [
-            ("sign-to-text", "Necesito ayuda"),
-            ("text-to-sign", "Estoy bien, gracias."),
-            ("sign-to-text", "Hola"),
-        ]
-        for direction, text in seed:
-            self._history.append(
-                HistoryEntry(
-                    id=uuid.uuid4().hex[:12],
-                    created_at=_now(),
-                    direction=direction,  # type: ignore[arg-type]
-                    text=text,
-                    is_demo=True,
-                )
-            )
-
-
-def _seed_phrases() -> list[QuickPhraseGroup]:
+def configure_repository() -> str:
     """
-    Frases semilla. Las senas LSP asociadas NO estan validadas: `is_demo=True`.
+    Decide y prepara el repositorio. Devuelve 'postgresql' o 'memory'.
     """
-    return [
-        QuickPhraseGroup(
-            category="saludos",
-            label="Saludos",
-            phrases=[
-                QuickPhrase(id="ph-hola", text="Hola", category="saludos"),
-                QuickPhrase(id="ph-gracias", text="Gracias", category="saludos"),
-                QuickPhrase(
-                    id="ph-por-favor", text="Por favor", category="saludos"
-                ),
-            ],
-        ),
-        QuickPhraseGroup(
-            category="necesidades",
-            label="Necesidades",
-            phrases=[
-                QuickPhrase(
-                    id="ph-ayuda", text="Necesito ayuda", category="necesidades"
-                ),
-                QuickPhrase(
-                    id="ph-no-entiendo",
-                    text="No entiendo",
-                    category="necesidades",
-                ),
-                QuickPhrase(
-                    id="ph-bano",
-                    text="¿Donde esta el bano?",
-                    category="necesidades",
-                ),
-            ],
-        ),
-        QuickPhraseGroup(
-            category="emergencias",
-            label="Emergencias",
-            phrases=[
-                QuickPhrase(
-                    id="ph-emergencias",
-                    text="Llame a emergencias",
-                    category="emergencias",
-                ),
-            ],
-        ),
-    ]
+    global _repository, _backend
+
+    if db.init_engine():
+        db.create_all()
+        seed_database()
+        _repository = SqlRepository()
+        _backend = "postgresql"
+    else:
+        if settings.require_database:
+            raise RuntimeError(
+                "No se pudo conectar a la base de datos y "
+                "CHASKIPE_REQUIRE_DATABASE=true."
+            )
+        _repository = MemoryRepository()
+        _backend = "memory"
+
+    return _backend
 
 
-store = MemoryStore()
+def get_repository() -> Repository:
+    return _repository
+
+
+def current_backend() -> str:
+    return _backend
+
+
+def use_memory_repository() -> None:
+    """Fuerza el repositorio en memoria (para los tests)."""
+    global _repository, _backend
+    _repository = MemoryRepository()
+    _backend = "memory"
