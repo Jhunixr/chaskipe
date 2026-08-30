@@ -3,9 +3,9 @@
 Aplicacion inclusiva para facilitar la comunicacion entre personas usuarias de
 **Lengua de Señas Peruana (LSP)** y personas oyentes.
 
-> **Estado actual: FASE 5 (pipeline de entrenamiento del modelo).**
-> Funciona con datos sinteticos de prueba. Muchas funcionalidades todavia
-> **no** existen. Ver [Estado actual](#estado-actual).
+> **Estado actual: FASE 6 (el modelo reconoce senas en "Senas a texto").**
+> El modelo es de prueba (datos sinteticos); aun no reconoce senas reales.
+> Ver [Estado actual](#estado-actual).
 
 ---
 
@@ -157,14 +157,21 @@ npm run lint
 - Inferencia **en el navegador**, sin servidor: `frontend/src/services/signModel.ts`
   (implementacion propia, sin TensorFlow.js).
 - La extraccion de features de Python y del frontend **coincide** (verificado, < 1e-6).
-- Validado de punta a punta con un **dataset sintetico** de prueba.
+
+**FASE 6 — Integracion del modelo**
+
+- El modelo esta **conectado a "Senas a texto"**. "Analizar sena" graba ~2 s de
+  landmarks, extrae features, ejecuta el MLP y muestra la palabra + confianza.
+- Umbral de confianza (60%) y comprobacion de manos; mensajes cuando no se
+  reconoce o no se ven las manos.
+- La palabra reconocida pasa a la pantalla de resultado (voz incluida).
+- Verificado de punta a punta en el navegador con el modelo sintetico.
 
 ### **No** implementado todavia
 
-- Reconocimiento real de senas: el boton "Analizar sena" sigue siendo un DEMO
-  simulado; el modelo **aun no esta conectado** a la pantalla (eso es FASE 6).
-- Muestras reales del dataset — el pipeline funciona con datos sinteticos; el
-  modelo actual **no reconoce senas reales**.
+- **El modelo no reconoce senas reales** — entrenado con datos sinteticos de
+  prueba. La pantalla lo avisa.
+- Muestras reales del dataset.
 - Pose y rostro (MediaPipe) — solo manos por ahora.
 - Autenticacion real (login y registro son de demostracion).
 - Backend FastAPI y endpoints.
@@ -185,8 +192,8 @@ han sido validadas con personas usuarias de LSP ni interpretes.
 | 2    | Camara                                      | Hecho       |
 | 3    | MediaPipe                                   | Hecho       |
 | 4    | Dataset                                     | Hecho       |
-| 5    | Modelo de IA                                | **Actual** (pipeline listo, falta dataset real) |
-| 6    | Integracion del modelo                      | Pendiente   |
+| 5    | Modelo de IA                                | Hecho (con datos sinteticos) |
+| 6    | Integracion del modelo                      | **Actual**  |
 | 7    | Backend FastAPI                             | Pendiente   |
 | 8    | PostgreSQL                                  | Pendiente   |
 | 9    | Avatar 3D                                   | Pendiente   |
