@@ -3,7 +3,7 @@
 Aplicacion inclusiva para facilitar la comunicacion entre personas usuarias de
 **Lengua de Señas Peruana (LSP)** y personas oyentes.
 
-> **Estado actual: FASE 2 (camara del dispositivo integrada).**
+> **Estado actual: FASE 3 (deteccion de manos con MediaPipe).**
 > Muchas funcionalidades todavia **no** existen. Ver [Estado actual](#estado-actual).
 
 ---
@@ -131,11 +131,20 @@ npm run lint
   navegador no compatible, con boton "Reintentar".
 - Alternar camara frontal/trasera; la frontal se muestra en espejo.
 
+**FASE 3 — MediaPipe (deteccion de manos)**
+
+- `@mediapipe/tasks-vision` con Hand Landmarker: 21 puntos por mano, hasta 2 manos.
+- Assets locales en `frontend/public/mediapipe/` (funciona offline).
+- `useHandLandmarker` + `HandOverlay`: landmarks dibujados sobre el video en vivo.
+- Estados en pantalla: "Cargando detector...", "Muestra las manos",
+  "1/2 manos detectadas".
+
 ### **No** implementado todavia
 
 - Reconocimiento real de senas: el boton "Analizar sena" es un DEMO simulado.
-- MediaPipe y extraccion de landmarks.
+  MediaPipe solo entrega la posicion de las manos.
 - Dataset y modelo de IA.
+- Pose y rostro (MediaPipe) — solo manos por ahora.
 - Autenticacion real (login y registro son de demostracion).
 - Backend FastAPI y endpoints.
 - Base de datos PostgreSQL.
@@ -152,8 +161,8 @@ han sido validadas con personas usuarias de LSP ni interpretes.
 | Fase | Contenido                                   | Estado      |
 | ---- | ------------------------------------------- | ----------- |
 | 1    | Frontend y estructura base                  | Hecho       |
-| 2    | Camara                                      | **Actual**  |
-| 3    | MediaPipe                                   | Pendiente   |
+| 2    | Camara                                      | Hecho       |
+| 3    | MediaPipe                                   | **Actual**  |
 | 4    | Dataset                                     | Pendiente   |
 | 5    | Modelo de IA                                | Pendiente   |
 | 6    | Integracion del modelo                      | Pendiente   |

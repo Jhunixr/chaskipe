@@ -49,6 +49,9 @@ ai/models/*
 *.pkl
 *.joblib
 
+# Excepcion: assets de MediaPipe del frontend SI se versionan (offline, reproducible)
+!frontend/public/mediapipe/**
+
 # ---------- Avatar / activos 3D pesados ----------
 avatar/exports/*
 !avatar/exports/.gitkeep
