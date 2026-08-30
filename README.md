@@ -3,7 +3,7 @@
 Aplicacion inclusiva para facilitar la comunicacion entre personas usuarias de
 **Lengua de Señas Peruana (LSP)** y personas oyentes.
 
-> **Estado actual: FASE 1 (estructura base + frontend).**
+> **Estado actual: FASE 2 (camara del dispositivo integrada).**
 > Muchas funcionalidades todavia **no** existen. Ver [Estado actual](#estado-actual).
 
 ---
@@ -110,26 +110,33 @@ npm run lint
 
 ## Estado actual
 
-### Implementado (FASE 1)
+### Implementado
+
+**FASE 1 — Frontend y estructura**
 
 - Estructura de carpetas de todo el proyecto.
 - Frontend React + TypeScript (estricto) + Vite + React Router.
 - Diseño mobile-first con identidad visual (crema, rojo, tarjetas blancas,
-  tipografia Nunito, motivo de montanas y cenefa andina sutiles).
+  tipografia Nunito, mascota del chaski, montanas y cenefa andina sutiles).
 - 16 pantallas: splash, onboarding, login, registro y las 12 pantallas de la app.
 - Navegacion inferior (Inicio / Conversacion / Historial / Perfil).
-- Componente de mascota/logo con marcador SVG hasta cargar la imagen real
-  (`frontend/src/assets/mascot/`).
 - Datos de ejemplo (mock) marcados como DEMO.
-- Lectura por voz mediante la Web Speech API del navegador.
-- Ajuste de tamano de texto que si afecta a toda la app.
+- Lectura por voz (Web Speech API) y ajuste de tamano de texto global.
+
+**FASE 2 — Camara**
+
+- Acceso a la camara del dispositivo con `getUserMedia` (`useCamera`).
+- Video en vivo en "Preparar camara" y "Senas a texto" (`CameraView`).
+- Manejo de permisos: pendiente, denegado, sin camara, camara ocupada,
+  navegador no compatible, con boton "Reintentar".
+- Alternar camara frontal/trasera; la frontal se muestra en espejo.
 
 ### **No** implementado todavia
 
-- Autenticacion real (login y registro son de demostracion).
-- Acceso real a la camara.
+- Reconocimiento real de senas: el boton "Analizar sena" es un DEMO simulado.
 - MediaPipe y extraccion de landmarks.
-- Dataset y modelo de IA / reconocimiento de señas.
+- Dataset y modelo de IA.
+- Autenticacion real (login y registro son de demostracion).
 - Backend FastAPI y endpoints.
 - Base de datos PostgreSQL.
 - Avatar 3D (Three.js) y animaciones de LSP.
@@ -144,8 +151,8 @@ han sido validadas con personas usuarias de LSP ni interpretes.
 
 | Fase | Contenido                                   | Estado      |
 | ---- | ------------------------------------------- | ----------- |
-| 1    | Frontend y estructura base                  | **Actual**  |
-| 2    | Camara                                      | Pendiente   |
+| 1    | Frontend y estructura base                  | Hecho       |
+| 2    | Camara                                      | **Actual**  |
 | 3    | MediaPipe                                   | Pendiente   |
 | 4    | Dataset                                     | Pendiente   |
 | 5    | Modelo de IA                                | Pendiente   |
