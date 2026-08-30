@@ -3,7 +3,7 @@
 Aplicacion inclusiva para facilitar la comunicacion entre personas usuarias de
 **Lengua de Señas Peruana (LSP)** y personas oyentes.
 
-> **Estado actual: FASE 3 (deteccion de manos con MediaPipe).**
+> **Estado actual: FASE 4 (captura de dataset de landmarks).**
 > Muchas funcionalidades todavia **no** existen. Ver [Estado actual](#estado-actual).
 
 ---
@@ -139,11 +139,20 @@ npm run lint
 - Estados en pantalla: "Cargando detector...", "Muestra las manos",
   "1/2 manos detectadas".
 
+**FASE 4 — Dataset**
+
+- Formato definido en `ai/data/DATASET_FORMAT.md` (1 JSON por grabacion).
+- Herramienta de captura en el frontend: `/dev/dataset`. Elegir sena,
+  consentimiento, grabar ~2 s, descargar JSON. Solo landmarks, no video.
+- Vocabulario inicial: HOLA, GRACIAS, AYUDA, SI, NO.
+- `ai/scripts/inspect_dataset.py`: resumen y validacion del dataset (stdlib).
+
 ### **No** implementado todavia
 
 - Reconocimiento real de senas: el boton "Analizar sena" es un DEMO simulado.
   MediaPipe solo entrega la posicion de las manos.
-- Dataset y modelo de IA.
+- Modelo de IA (FASE 5).
+- Muestras reales del dataset — la herramienta existe pero el dataset esta vacio.
 - Pose y rostro (MediaPipe) — solo manos por ahora.
 - Autenticacion real (login y registro son de demostracion).
 - Backend FastAPI y endpoints.
@@ -162,8 +171,8 @@ han sido validadas con personas usuarias de LSP ni interpretes.
 | ---- | ------------------------------------------- | ----------- |
 | 1    | Frontend y estructura base                  | Hecho       |
 | 2    | Camara                                      | Hecho       |
-| 3    | MediaPipe                                   | **Actual**  |
-| 4    | Dataset                                     | Pendiente   |
+| 3    | MediaPipe                                   | Hecho       |
+| 4    | Dataset                                     | **Actual**  |
 | 5    | Modelo de IA                                | Pendiente   |
 | 6    | Integracion del modelo                      | Pendiente   |
 | 7    | Backend FastAPI                             | Pendiente   |

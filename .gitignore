@@ -33,13 +33,16 @@ ENV/
 !.env.example
 
 # ---------- Modelos y datos pesados ----------
-# El dataset y los modelos entrenados no se versionan (ver ai/README.md)
-ai/data/raw/*
-ai/data/processed/*
-!ai/data/raw/.gitkeep
+# Las grabaciones del dataset y los modelos entrenados NO se versionan
+# (ver ai/data/DATASET_FORMAT.md). Se conservan la estructura de carpetas,
+# los .gitkeep, los README y los .md de documentacion.
+ai/data/raw/**/*.json
+ai/data/processed/**
 !ai/data/processed/.gitkeep
 ai/models/*
 !ai/models/.gitkeep
+!**/.gitkeep
+!**/*.md
 *.h5
 *.keras
 *.tflite
