@@ -3,8 +3,8 @@
 Aplicacion inclusiva para facilitar la comunicacion entre personas usuarias de
 **Lengua de Señas Peruana (LSP)** y personas oyentes.
 
-> **Estado actual: FASE 8 (PostgreSQL: perfil, historial y frases persistentes).**
-> El modelo de reconocimiento sigue siendo de prueba (datos sinteticos).
+> **Estado actual: FASE 9 (avatar 3D basico con Three.js).**
+> El avatar no representa senas reales; el modelo de reconocimiento es de prueba.
 > Ver [Estado actual](#estado-actual).
 
 ---
@@ -62,7 +62,7 @@ El dataset de IA vive en `ai/data/`, **no** en la base de datos.
 | Backend       | Python, FastAPI, SQLAlchemy, Alembic         |
 | IA            | Python, MediaPipe, TensorFlow/Keras (entreno) |
 | Base de datos | PostgreSQL 16 (Docker)                       |
-| Avatar        | Blender, Three.js, GLB/glTF *(futuro)*       |
+| Avatar        | Three.js (Blender + GLB en la FASE 10)       |
 | Control de versiones | Git                                  |
 | Gestor de paquetes   | npm, pip                             |
 
@@ -207,17 +207,26 @@ uvicorn app.main:app --reload
 - SQLAlchemy 2.0 (`app/db/base.py`) + Alembic (`backend/alembic/`).
 - Patron repositorio: `SqlRepository` con **fallback a `MemoryRepository`** si
   la BD no responde; `/health` indica cual esta activo.
-- Tablas: `usuarios`, `frases`, `historial_traduccion` (+ semilla).
 - El perfil y el historial **sobreviven al reinicio del backend**.
 - 15 pruebas (`pytest`), incluye integracion real con PostgreSQL.
+
+**FASE 9 — Avatar 3D**
+
+- Escena **Three.js** en "Texto a senas": avatar **geometrico** (no un GLB) que
+  respira, parpadea y reproduce un **gesto DEMO**.
+- `components/avatar/` (rig, animation, scene, Avatar3D). Carga diferida
+  (`React.lazy`): el chunk de Three.js solo se baja en esa pantalla.
+- El gesto **no representa ninguna sena real**; la pantalla lo avisa.
 
 ### **No** implementado todavia
 
 - **El modelo no reconoce senas reales** — entrenado con datos sinteticos de
   prueba. La pantalla lo avisa.
+- **El avatar no representa senas** — gesto DEMO. GLB + animaciones LSP
+  validadas es la FASE 10.
 - Muestras reales del dataset.
 - Autenticacion real (login y registro son de demostracion); un unico usuario.
-- Avatar 3D (Three.js) y animaciones de LSP.
+- Conversion texto -> secuencia LSP.
 - Pose y rostro (MediaPipe) — solo manos por ahora.
 
 Las equivalencias texto ↔ seña mostradas en la app son **demostrativas** y no
@@ -236,7 +245,7 @@ han sido validadas con personas usuarias de LSP ni interpretes.
 | 5    | Modelo de IA                                | Hecho (con datos sinteticos) |
 | 6    | Integracion del modelo                      | Hecho (tiempo real) |
 | 7    | Backend FastAPI                             | Hecho       |
-| 8    | PostgreSQL                                  | **Actual**  |
-| 9    | Avatar 3D                                   | Pendiente   |
+| 8    | PostgreSQL                                  | Hecho       |
+| 9    | Avatar 3D                                   | **Actual** (basico, gesto DEMO) |
 | 10   | Animaciones LSP validadas                   | Pendiente   |
 | 11   | Integracion completa                        | Pendiente   |
