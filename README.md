@@ -158,14 +158,15 @@ npm run lint
   (implementacion propia, sin TensorFlow.js).
 - La extraccion de features de Python y del frontend **coincide** (verificado, < 1e-6).
 
-**FASE 6 — Integracion del modelo**
+**FASE 6 — Integracion del modelo (tiempo real)**
 
-- El modelo esta **conectado a "Senas a texto"**. "Analizar sena" graba ~2 s de
-  landmarks, extrae features, ejecuta el MLP y muestra la palabra + confianza.
-- Umbral de confianza (60%) y comprobacion de manos; mensajes cuando no se
-  reconoce o no se ven las manos.
-- La palabra reconocida pasa a la pantalla de resultado (voz incluida).
-- Verificado de punta a punta en el navegador con el modelo sintetico.
+- El modelo esta **conectado a "Senas a texto"** y analiza **en tiempo real**:
+  ventana deslizante de 2 s, prediccion cada ~300 ms, sin boton de disparo.
+- Muestra el candidato en vivo y lo **confirma** cuando se mantiene estable
+  ~0.6 s por encima del 60 % de confianza; luego pausa para no repetir.
+- La sena confirmada pasa a la pantalla de resultado (con voz).
+- Verificado: la logica de confirmacion acierta 5/5 clases con landmarks reales;
+  el bucle en vivo corre en el navegador sin errores.
 
 ### **No** implementado todavia
 
