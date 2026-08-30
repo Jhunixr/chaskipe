@@ -41,6 +41,10 @@ ai/data/processed/**
 !ai/data/processed/.gitkeep
 ai/models/*
 !ai/models/.gitkeep
+# Modelo exportado al frontend: se genera con ai/scripts/export_tfjs.py,
+# no se versiona (puede ser sintetico de prueba). Se conserva el README.
+frontend/public/models/sign/*
+!frontend/public/models/sign/.gitkeep
 !**/.gitkeep
 !**/*.md
 *.h5

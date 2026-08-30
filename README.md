@@ -3,8 +3,9 @@
 Aplicacion inclusiva para facilitar la comunicacion entre personas usuarias de
 **Lengua de Señas Peruana (LSP)** y personas oyentes.
 
-> **Estado actual: FASE 4 (captura de dataset de landmarks).**
-> Muchas funcionalidades todavia **no** existen. Ver [Estado actual](#estado-actual).
+> **Estado actual: FASE 5 (pipeline de entrenamiento del modelo).**
+> Funciona con datos sinteticos de prueba. Muchas funcionalidades todavia
+> **no** existen. Ver [Estado actual](#estado-actual).
 
 ---
 
@@ -147,12 +148,23 @@ npm run lint
 - Vocabulario inicial: HOLA, GRACIAS, AYUDA, SI, NO.
 - `ai/scripts/inspect_dataset.py`: resumen y validacion del dataset (stdlib).
 
+**FASE 5 — Modelo de IA**
+
+- Pipeline Python completo en `ai/scripts/`: `synth_dataset` → `preprocess` →
+  `train` → `evaluate` → `export_tfjs`. Ver `ai/README.md`.
+- **MLP** (381 features → 128 → 64 → n_clases). Features: estadisticos temporales
+  de los landmarks normalizados de cada mano.
+- Inferencia **en el navegador**, sin servidor: `frontend/src/services/signModel.ts`
+  (implementacion propia, sin TensorFlow.js).
+- La extraccion de features de Python y del frontend **coincide** (verificado, < 1e-6).
+- Validado de punta a punta con un **dataset sintetico** de prueba.
+
 ### **No** implementado todavia
 
-- Reconocimiento real de senas: el boton "Analizar sena" es un DEMO simulado.
-  MediaPipe solo entrega la posicion de las manos.
-- Modelo de IA (FASE 5).
-- Muestras reales del dataset — la herramienta existe pero el dataset esta vacio.
+- Reconocimiento real de senas: el boton "Analizar sena" sigue siendo un DEMO
+  simulado; el modelo **aun no esta conectado** a la pantalla (eso es FASE 6).
+- Muestras reales del dataset — el pipeline funciona con datos sinteticos; el
+  modelo actual **no reconoce senas reales**.
 - Pose y rostro (MediaPipe) — solo manos por ahora.
 - Autenticacion real (login y registro son de demostracion).
 - Backend FastAPI y endpoints.
@@ -172,8 +184,8 @@ han sido validadas con personas usuarias de LSP ni interpretes.
 | 1    | Frontend y estructura base                  | Hecho       |
 | 2    | Camara                                      | Hecho       |
 | 3    | MediaPipe                                   | Hecho       |
-| 4    | Dataset                                     | **Actual**  |
-| 5    | Modelo de IA                                | Pendiente   |
+| 4    | Dataset                                     | Hecho       |
+| 5    | Modelo de IA                                | **Actual** (pipeline listo, falta dataset real) |
 | 6    | Integracion del modelo                      | Pendiente   |
 | 7    | Backend FastAPI                             | Pendiente   |
 | 8    | PostgreSQL                                  | Pendiente   |
