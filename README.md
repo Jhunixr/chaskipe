@@ -3,8 +3,8 @@
 Aplicacion inclusiva para facilitar la comunicacion entre personas usuarias de
 **Lengua de Señas Peruana (LSP)** y personas oyentes.
 
-> **Estado actual: FASE 6 (el modelo reconoce senas en "Senas a texto").**
-> El modelo es de prueba (datos sinteticos); aun no reconoce senas reales.
+> **Estado actual: FASE 7 (backend FastAPI: perfil, historial, frases).**
+> Persistencia en memoria; el modelo de reconocimiento es de prueba.
 > Ver [Estado actual](#estado-actual).
 
 ---
@@ -99,6 +99,9 @@ npm run dev
 Abrir http://localhost:5173 (la app abre en `/` con la pantalla de carga y
 avanza a la bienvenida).
 
+La app funciona **con o sin backend**. Para perfil e historial persistentes,
+levanta tambien el backend (ver siguiente seccion).
+
 Otros comandos:
 
 ```bash
@@ -106,6 +109,24 @@ npm run build    # verificacion de tipos + build de produccion
 npm run preview  # servir el build
 npm run lint
 ```
+
+---
+
+## Como ejecutar el backend (opcional)
+
+Requisitos: Python 3.11 o 3.12.
+
+```bash
+cd backend
+py -m venv .venv
+.venv\Scripts\activate            # Windows
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+- API: http://127.0.0.1:8000 · Docs: http://127.0.0.1:8000/docs
+- Persistencia **en memoria** (se pierde al reiniciar). PostgreSQL es la FASE 8.
+- Si no lo levantas, el frontend usa datos de ejemplo.
 
 ---
 
@@ -164,21 +185,29 @@ npm run lint
   ventana deslizante de 2 s, prediccion cada ~300 ms, sin boton de disparo.
 - Muestra el candidato en vivo y lo **confirma** cuando se mantiene estable
   ~0.6 s por encima del 60 % de confianza; luego pausa para no repetir.
-- La sena confirmada pasa a la pantalla de resultado (con voz).
-- Verificado: la logica de confirmacion acierta 5/5 clases con landmarks reales;
-  el bucle en vivo corre en el navegador sin errores.
+- La sena confirmada pasa a la pantalla de resultado (con voz) y se guarda en
+  el historial via la API.
+
+**FASE 7 — Backend FastAPI**
+
+- API REST (`backend/`, FastAPI + Uvicorn): perfil (GET/PUT), historial
+  (GET/POST/DELETE), frases rapidas (GET), `/health`, `/docs`.
+- Persistencia **en memoria** (`app/services/store.py`). PostgreSQL es la FASE 8.
+- Sin autenticacion. Sin endpoint de inferencia (el modelo corre en el navegador).
+- El frontend conecta con **fallback a mock**: funciona con o sin backend
+  (`VITE_API_URL`, `src/services/api.ts`).
+- 12 pruebas (`pytest`); integracion verificada en el navegador.
 
 ### **No** implementado todavia
 
 - **El modelo no reconoce senas reales** — entrenado con datos sinteticos de
   prueba. La pantalla lo avisa.
 - Muestras reales del dataset.
-- Pose y rostro (MediaPipe) — solo manos por ahora.
+- Persistencia real: al reiniciar el backend se pierden los cambios (FASE 8).
 - Autenticacion real (login y registro son de demostracion).
-- Backend FastAPI y endpoints.
 - Base de datos PostgreSQL.
 - Avatar 3D (Three.js) y animaciones de LSP.
-- Persistencia de perfil, historial y la mayoria de preferencias.
+- Pose y rostro (MediaPipe) — solo manos por ahora.
 
 Las equivalencias texto ↔ seña mostradas en la app son **demostrativas** y no
 han sido validadas con personas usuarias de LSP ni interpretes.
@@ -194,8 +223,8 @@ han sido validadas con personas usuarias de LSP ni interpretes.
 | 3    | MediaPipe                                   | Hecho       |
 | 4    | Dataset                                     | Hecho       |
 | 5    | Modelo de IA                                | Hecho (con datos sinteticos) |
-| 6    | Integracion del modelo                      | **Actual**  |
-| 7    | Backend FastAPI                             | Pendiente   |
+| 6    | Integracion del modelo                      | Hecho       |
+| 7    | Backend FastAPI                             | **Actual** (persistencia en memoria) |
 | 8    | PostgreSQL                                  | Pendiente   |
 | 9    | Avatar 3D                                   | Pendiente   |
 | 10   | Animaciones LSP validadas                   | Pendiente   |
