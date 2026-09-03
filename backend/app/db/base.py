@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, String, create_engine
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, create_engine
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -27,27 +27,28 @@ def _utcnow() -> datetime:
 
 
 class Usuario(Base):
-    """
-    Perfil del usuario. FASE 8 asume un unico usuario (id fijo = 1);
-    la autenticacion y multi-usuario son fases posteriores.
-    """
+    """Cuenta de una persona usuaria. La contrasena se guarda hasheada."""
 
     __tablename__ = "usuarios"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     nombre: Mapped[str] = mapped_column(String(80))
-    correo: Mapped[str] = mapped_column(String(255))
+    correo: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    contrasena_hash: Mapped[str] = mapped_column(String(255))
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow
+    )
 
 
 class PreferenciaAccesibilidad(Base):
-    """
-    Preferencias de accesibilidad. Como `Usuario`, asume un unico usuario
-    (id fijo = 1) hasta que exista autenticacion.
-    """
+    """Preferencias de accesibilidad de un usuario (una fila por usuario)."""
 
     __tablename__ = "preferencias_accesibilidad"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"), unique=True, index=True
+    )
     tema: Mapped[str] = mapped_column(String(10), default="sistema")
     tamano_texto: Mapped[str] = mapped_column(String(12), default="normal")
     velocidad_voz: Mapped[str] = mapped_column(String(10), default="normal")
@@ -69,9 +70,14 @@ class Frase(Base):
 
 
 class HistorialTraduccion(Base):
+    """Traduccion guardada. Pertenece a un usuario."""
+
     __tablename__ = "historial_traduccion"
 
     id: Mapped[str] = mapped_column(String(12), primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"), index=True
+    )
     direccion: Mapped[str] = mapped_column(String(20))  # sign-to-text | text-to-sign
     texto: Mapped[str] = mapped_column(String(500))
     es_demo: Mapped[bool] = mapped_column(default=True)

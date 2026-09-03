@@ -17,6 +17,10 @@ sqlalchemy>=2.0,<3
 alembic>=1.13
 psycopg[binary]>=3.2   # driver PostgreSQL
 
+# Autenticacion: contrasenas hasheadas (bcrypt) y tokens JWT
+pwdlib[bcrypt]>=0.2
+pyjwt>=2.9
+
 # Desarrollo / pruebas
 pytest>=8.2
 httpx>=0.27            # cliente para los tests de la API

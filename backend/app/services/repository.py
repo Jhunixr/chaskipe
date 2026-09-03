@@ -1,23 +1,29 @@
 """
-Repositorio de datos (FASE 8).
+Repositorio de datos.
 
 `Repository` es la interfaz que usan los endpoints. Hay dos implementaciones:
-- `MemoryRepository`  — todo en memoria (FASE 7, y fallback si no hay BD)
-- `SqlRepository`     — PostgreSQL via SQLAlchemy (FASE 8)
+- `MemoryRepository`  — todo en memoria (fallback si no hay BD)
+- `SqlRepository`     — PostgreSQL via SQLAlchemy
 
 `get_repository()` (en `app.services.store`) devuelve la que corresponda.
+
+Multi-usuario: el perfil, las preferencias y el historial pertenecen a un
+usuario concreto (`user_id`). Las frases rapidas son catalogo compartido.
 """
 from __future__ import annotations
 
 import threading
 import uuid
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Protocol
 
 from pydantic import ValidationError
 from sqlalchemy import delete, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password, verify_password
 from app.db.base import (
     Frase,
     HistorialTraduccion,
@@ -25,12 +31,11 @@ from app.db.base import (
     Usuario,
     get_session,
 )
+from app.schemas.auth import AuthUser
 from app.schemas.history import HistoryEntry, HistoryEntryCreate
 from app.schemas.phrases import QuickPhrase, QuickPhraseGroup
 from app.schemas.preferences import Preferences
 from app.schemas.profile import Profile
-
-USER_ID = 1  # FASE 8: un unico usuario
 
 CATEGORY_LABELS = {
     "saludos": "Saludos",
@@ -40,12 +45,12 @@ CATEGORY_LABELS = {
 CATEGORY_ORDER = ["saludos", "necesidades", "emergencias"]
 
 
+class EmailAlreadyUsed(Exception):
+    """El correo ya pertenece a otra cuenta."""
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
-
-
-def _seed_profile() -> Profile:
-    return Profile(name="Andersson", email="andersson@example.pe")
 
 
 def _seed_phrases() -> list[QuickPhrase]:
@@ -65,17 +70,9 @@ def _seed_phrases() -> list[QuickPhrase]:
     ]
 
 
-def _seed_history() -> list[tuple[str, str]]:
-    return [
-        ("sign-to-text", "Necesito ayuda"),
-        ("text-to-sign", "Estoy bien, gracias."),
-        ("sign-to-text", "Hola"),
-    ]
-
-
-def _prefs_to_row(p: Preferences) -> PreferenciaAccesibilidad:
+def _prefs_to_row(p: Preferences, user_id: int) -> PreferenciaAccesibilidad:
     return PreferenciaAccesibilidad(
-        id=USER_ID,
+        usuario_id=user_id,
         tema=p.theme,
         tamano_texto=p.text_size,
         velocidad_voz=p.voice_speed,
@@ -120,14 +117,24 @@ def _group_phrases(phrases: list[QuickPhrase]) -> list[QuickPhraseGroup]:
 
 
 class Repository(Protocol):
-    def get_profile(self) -> Profile: ...
-    def update_profile(self, name: str, email: str) -> Profile: ...
-    def get_preferences(self) -> Preferences: ...
-    def update_preferences(self, data: Preferences) -> Preferences: ...
-    def list_history(self, limit: int | None = None) -> list[HistoryEntry]: ...
-    def add_history(self, data: HistoryEntryCreate) -> HistoryEntry: ...
-    def delete_history(self, entry_id: str) -> bool: ...
-    def clear_history(self) -> int: ...
+    # ---- Cuentas ----
+    def create_user(self, name: str, email: str, password: str) -> AuthUser: ...
+    def authenticate(self, email: str, password: str) -> AuthUser | None: ...
+    def get_user(self, user_id: int) -> AuthUser | None: ...
+
+    # ---- Datos por usuario ----
+    def get_profile(self, user_id: int) -> Profile: ...
+    def update_profile(self, user_id: int, name: str, email: str) -> Profile: ...
+    def get_preferences(self, user_id: int) -> Preferences: ...
+    def update_preferences(self, user_id: int, data: Preferences) -> Preferences: ...
+    def list_history(
+        self, user_id: int, limit: int | None = None
+    ) -> list[HistoryEntry]: ...
+    def add_history(self, user_id: int, data: HistoryEntryCreate) -> HistoryEntry: ...
+    def delete_history(self, user_id: int, entry_id: str) -> bool: ...
+    def clear_history(self, user_id: int) -> int: ...
+
+    # ---- Catalogo compartido ----
     def list_phrase_groups(self) -> list[QuickPhraseGroup]: ...
 
 
@@ -136,71 +143,129 @@ class Repository(Protocol):
 # --------------------------------------------------------------------------
 
 
+@dataclass
+class _MemUser:
+    id: int
+    name: str
+    email: str
+    password_hash: str
+    preferences: Preferences = field(default_factory=Preferences)
+    history: list[HistoryEntry] = field(default_factory=list)
+
+
 class MemoryRepository:
     def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._profile = _seed_profile()
-        self._preferences = Preferences()
+        self._users: dict[int, _MemUser] = {}
+        self._next_id = 1
         self._phrases = _seed_phrases()
-        self._history: list[HistoryEntry] = []
-        for direction, text in _seed_history():
-            self._history.append(
-                HistoryEntry(
-                    id=uuid.uuid4().hex[:12],
-                    created_at=_now(),
-                    direction=direction,  # type: ignore[arg-type]
-                    text=text,
-                    is_demo=True,
-                )
+
+    # ---- Cuentas ----
+    def _find_by_email(self, email: str) -> _MemUser | None:
+        target = email.strip().lower()
+        return next(
+            (u for u in self._users.values() if u.email.lower() == target), None
+        )
+
+    def create_user(self, name: str, email: str, password: str) -> AuthUser:
+        with self._lock:
+            if self._find_by_email(email) is not None:
+                raise EmailAlreadyUsed(email)
+            user = _MemUser(
+                id=self._next_id,
+                name=name,
+                email=email,
+                password_hash=hash_password(password),
             )
+            self._users[user.id] = user
+            self._next_id += 1
+            return AuthUser(id=user.id, name=user.name, email=user.email)
 
-    def get_profile(self) -> Profile:
+    def authenticate(self, email: str, password: str) -> AuthUser | None:
         with self._lock:
-            return self._profile.model_copy()
+            user = self._find_by_email(email)
+            if user is None or not verify_password(password, user.password_hash):
+                return None
+            return AuthUser(id=user.id, name=user.name, email=user.email)
 
-    def update_profile(self, name: str, email: str) -> Profile:
+    def get_user(self, user_id: int) -> AuthUser | None:
         with self._lock:
-            self._profile = Profile(name=name, email=email)
-            return self._profile.model_copy()
+            user = self._users.get(user_id)
+            if user is None:
+                return None
+            return AuthUser(id=user.id, name=user.name, email=user.email)
 
-    def get_preferences(self) -> Preferences:
+    def _require(self, user_id: int) -> _MemUser:
+        user = self._users.get(user_id)
+        if user is None:
+            raise KeyError(f"usuario {user_id} no existe")
+        return user
+
+    # ---- Perfil ----
+    def get_profile(self, user_id: int) -> Profile:
         with self._lock:
-            return self._preferences.model_copy()
+            user = self._require(user_id)
+            return Profile(name=user.name, email=user.email)
 
-    def update_preferences(self, data: Preferences) -> Preferences:
+    def update_profile(self, user_id: int, name: str, email: str) -> Profile:
         with self._lock:
-            self._preferences = data.model_copy()
-            return self._preferences.model_copy()
+            user = self._require(user_id)
+            other = self._find_by_email(email)
+            if other is not None and other.id != user_id:
+                raise EmailAlreadyUsed(email)
+            user.name = name
+            user.email = email
+            return Profile(name=user.name, email=user.email)
 
-    def list_history(self, limit: int | None = None) -> list[HistoryEntry]:
+    # ---- Preferencias ----
+    def get_preferences(self, user_id: int) -> Preferences:
+        with self._lock:
+            return self._require(user_id).preferences.model_copy()
+
+    def update_preferences(self, user_id: int, data: Preferences) -> Preferences:
+        with self._lock:
+            user = self._require(user_id)
+            user.preferences = data.model_copy()
+            return user.preferences.model_copy()
+
+    # ---- Historial ----
+    def list_history(
+        self, user_id: int, limit: int | None = None
+    ) -> list[HistoryEntry]:
         with self._lock:
             items = sorted(
-                self._history, key=lambda e: e.created_at, reverse=True
+                self._require(user_id).history,
+                key=lambda e: e.created_at,
+                reverse=True,
             )
             return items[:limit] if limit else list(items)
 
-    def add_history(self, data: HistoryEntryCreate) -> HistoryEntry:
+    def add_history(self, user_id: int, data: HistoryEntryCreate) -> HistoryEntry:
         with self._lock:
+            user = self._require(user_id)
             entry = HistoryEntry(
                 id=uuid.uuid4().hex[:12],
                 created_at=_now(),
                 **data.model_dump(),
             )
-            self._history.append(entry)
+            user.history.append(entry)
             return entry
 
-    def delete_history(self, entry_id: str) -> bool:
+    def delete_history(self, user_id: int, entry_id: str) -> bool:
         with self._lock:
-            before = len(self._history)
-            self._history = [e for e in self._history if e.id != entry_id]
-            return len(self._history) < before
+            user = self._require(user_id)
+            before = len(user.history)
+            user.history = [e for e in user.history if e.id != entry_id]
+            return len(user.history) < before
 
-    def clear_history(self) -> int:
+    def clear_history(self, user_id: int) -> int:
         with self._lock:
-            n = len(self._history)
-            self._history = []
+            user = self._require(user_id)
+            n = len(user.history)
+            user.history = []
             return n
 
+    # ---- Frases ----
     def list_phrase_groups(self) -> list[QuickPhraseGroup]:
         with self._lock:
             return _group_phrases([p.model_copy() for p in self._phrases])
@@ -217,45 +282,89 @@ class SqlRepository:
     def _session(self) -> Session:
         return get_session()
 
-    # ---- Perfil ----
-    def get_profile(self) -> Profile:
+    # ---- Cuentas ----
+    def create_user(self, name: str, email: str, password: str) -> AuthUser:
         with self._session() as s:
-            user = s.get(Usuario, USER_ID)
-            if user is None:
-                seed = _seed_profile()
-                user = Usuario(id=USER_ID, nombre=seed.name, correo=seed.email)
-                s.add(user)
+            row = Usuario(
+                nombre=name,
+                correo=email,
+                contrasena_hash=hash_password(password),
+                creado_en=_now(),
+            )
+            s.add(row)
+            try:
                 s.commit()
+            except IntegrityError as exc:
+                # El indice unico de `correo` es la garantia real frente a dos
+                # registros simultaneos con el mismo correo.
+                s.rollback()
+                raise EmailAlreadyUsed(email) from exc
+            s.refresh(row)
+            # Preferencias por defecto para la cuenta recien creada.
+            s.add(_prefs_to_row(Preferences(), row.id))
+            s.commit()
+            return AuthUser(id=row.id, name=row.nombre, email=row.correo)
+
+    def authenticate(self, email: str, password: str) -> AuthUser | None:
+        with self._session() as s:
+            row = s.scalar(select(Usuario).where(Usuario.correo == email))
+            if row is None or not verify_password(password, row.contrasena_hash):
+                return None
+            return AuthUser(id=row.id, name=row.nombre, email=row.correo)
+
+    def get_user(self, user_id: int) -> AuthUser | None:
+        with self._session() as s:
+            row = s.get(Usuario, user_id)
+            if row is None:
+                return None
+            return AuthUser(id=row.id, name=row.nombre, email=row.correo)
+
+    # ---- Perfil ----
+    def get_profile(self, user_id: int) -> Profile:
+        with self._session() as s:
+            user = s.get(Usuario, user_id)
+            if user is None:
+                raise KeyError(f"usuario {user_id} no existe")
             return Profile(name=user.nombre, email=user.correo)
 
-    def update_profile(self, name: str, email: str) -> Profile:
+    def update_profile(self, user_id: int, name: str, email: str) -> Profile:
         with self._session() as s:
-            user = s.get(Usuario, USER_ID)
+            user = s.get(Usuario, user_id)
             if user is None:
-                user = Usuario(id=USER_ID, nombre=name, correo=email)
-                s.add(user)
-            else:
-                user.nombre = name
-                user.correo = email
-            s.commit()
+                raise KeyError(f"usuario {user_id} no existe")
+            user.nombre = name
+            user.correo = email
+            try:
+                s.commit()
+            except IntegrityError as exc:
+                s.rollback()
+                raise EmailAlreadyUsed(email) from exc
             return Profile(name=user.nombre, email=user.correo)
 
     # ---- Preferencias ----
-    def get_preferences(self) -> Preferences:
+    def get_preferences(self, user_id: int) -> Preferences:
         with self._session() as s:
-            row = s.get(PreferenciaAccesibilidad, USER_ID)
+            row = s.scalar(
+                select(PreferenciaAccesibilidad).where(
+                    PreferenciaAccesibilidad.usuario_id == user_id
+                )
+            )
             if row is None:
                 defaults = Preferences()
-                s.add(_prefs_to_row(defaults))
+                s.add(_prefs_to_row(defaults, user_id))
                 s.commit()
                 return defaults
             return _row_to_prefs(row)
 
-    def update_preferences(self, data: Preferences) -> Preferences:
+    def update_preferences(self, user_id: int, data: Preferences) -> Preferences:
         with self._session() as s:
-            row = s.get(PreferenciaAccesibilidad, USER_ID)
+            row = s.scalar(
+                select(PreferenciaAccesibilidad).where(
+                    PreferenciaAccesibilidad.usuario_id == user_id
+                )
+            )
             if row is None:
-                s.add(_prefs_to_row(data))
+                s.add(_prefs_to_row(data, user_id))
             else:
                 row.tema = data.theme
                 row.tamano_texto = data.text_size
@@ -267,10 +376,14 @@ class SqlRepository:
             return data.model_copy()
 
     # ---- Historial ----
-    def list_history(self, limit: int | None = None) -> list[HistoryEntry]:
+    def list_history(
+        self, user_id: int, limit: int | None = None
+    ) -> list[HistoryEntry]:
         with self._session() as s:
-            stmt = select(HistorialTraduccion).order_by(
-                HistorialTraduccion.creado_en.desc()
+            stmt = (
+                select(HistorialTraduccion)
+                .where(HistorialTraduccion.usuario_id == user_id)
+                .order_by(HistorialTraduccion.creado_en.desc())
             )
             if limit:
                 stmt = stmt.limit(limit)
@@ -286,10 +399,11 @@ class SqlRepository:
                 for r in rows
             ]
 
-    def add_history(self, data: HistoryEntryCreate) -> HistoryEntry:
+    def add_history(self, user_id: int, data: HistoryEntryCreate) -> HistoryEntry:
         with self._session() as s:
             row = HistorialTraduccion(
                 id=uuid.uuid4().hex[:12],
+                usuario_id=user_id,
                 direccion=data.direction,
                 texto=data.text,
                 es_demo=data.is_demo,
@@ -305,18 +419,24 @@ class SqlRepository:
                 created_at=row.creado_en,
             )
 
-    def delete_history(self, entry_id: str) -> bool:
+    def delete_history(self, user_id: int, entry_id: str) -> bool:
         with self._session() as s:
             row = s.get(HistorialTraduccion, entry_id)
-            if row is None:
+            # Comprobar el dueno: sin esto cualquiera podria borrar entradas
+            # ajenas conociendo el id.
+            if row is None or row.usuario_id != user_id:
                 return False
             s.delete(row)
             s.commit()
             return True
 
-    def clear_history(self) -> int:
+    def clear_history(self, user_id: int) -> int:
         with self._session() as s:
-            result = s.execute(delete(HistorialTraduccion))
+            result = s.execute(
+                delete(HistorialTraduccion).where(
+                    HistorialTraduccion.usuario_id == user_id
+                )
+            )
             s.commit()
             return int(result.rowcount or 0)
 
@@ -339,15 +459,12 @@ class SqlRepository:
 
 
 def seed_database() -> None:
-    """Inserta los datos semilla si las tablas estan vacias."""
+    """
+    Inserta el catalogo de frases si esta vacio.
+
+    NO crea usuarios: las cuentas se crean al registrarse.
+    """
     with get_session() as s:
-        if s.get(Usuario, USER_ID) is None:
-            seed = _seed_profile()
-            s.add(Usuario(id=USER_ID, nombre=seed.name, correo=seed.email))
-
-        if s.get(PreferenciaAccesibilidad, USER_ID) is None:
-            s.add(_prefs_to_row(Preferences()))
-
         if s.scalar(select(Frase).limit(1)) is None:
             for order, p in enumerate(_seed_phrases()):
                 s.add(
@@ -359,16 +476,4 @@ def seed_database() -> None:
                         es_demo=p.is_demo,
                     )
                 )
-
-        if s.scalar(select(HistorialTraduccion).limit(1)) is None:
-            for direction, text in _seed_history():
-                s.add(
-                    HistorialTraduccion(
-                        id=uuid.uuid4().hex[:12],
-                        direccion=direction,
-                        texto=text,
-                        es_demo=True,
-                        creado_en=_now(),
-                    )
-                )
-        s.commit()
+            s.commit()

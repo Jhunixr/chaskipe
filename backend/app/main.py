@@ -23,7 +23,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import history, phrases, preferences, profile
+from app.api import auth, history, phrases, preferences, profile
 from app.core.config import settings
 from app.services import store
 
@@ -63,6 +63,7 @@ def health() -> dict[str, str]:
 
 
 API_PREFIX = "/api/v1"
+app.include_router(auth.router, prefix=API_PREFIX)
 app.include_router(profile.router, prefix=API_PREFIX)
 app.include_router(preferences.router, prefix=API_PREFIX)
 app.include_router(history.router, prefix=API_PREFIX)

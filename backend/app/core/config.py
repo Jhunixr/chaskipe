@@ -1,6 +1,8 @@
 """Configuracion del backend (FASE 7)."""
 from __future__ import annotations
 
+import secrets
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,6 +31,14 @@ class Settings(BaseSettings):
     )
     # Si es True, el backend falla al arrancar si no hay base de datos.
     require_database: bool = False
+
+    # --- Autenticacion ---
+    # Clave para firmar los JWT. En desarrollo se genera una al azar en cada
+    # arranque (los tokens dejan de valer al reiniciar, que es lo deseable).
+    # En produccion DEBE definirse: CHASKIPE_SECRET_KEY=...
+    secret_key: str = secrets.token_urlsafe(32)
+    jwt_algorithm: str = "HS256"
+    access_token_minutes: int = 60 * 24 * 7  # 7 dias
 
 
 settings = Settings()
