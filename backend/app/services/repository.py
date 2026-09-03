@@ -14,12 +14,20 @@ import uuid
 from datetime import datetime, timezone
 from typing import Protocol
 
+from pydantic import ValidationError
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.db.base import Frase, HistorialTraduccion, Usuario, get_session
+from app.db.base import (
+    Frase,
+    HistorialTraduccion,
+    PreferenciaAccesibilidad,
+    Usuario,
+    get_session,
+)
 from app.schemas.history import HistoryEntry, HistoryEntryCreate
 from app.schemas.phrases import QuickPhrase, QuickPhraseGroup
+from app.schemas.preferences import Preferences
 from app.schemas.profile import Profile
 
 USER_ID = 1  # FASE 8: un unico usuario
@@ -65,6 +73,37 @@ def _seed_history() -> list[tuple[str, str]]:
     ]
 
 
+def _prefs_to_row(p: Preferences) -> PreferenciaAccesibilidad:
+    return PreferenciaAccesibilidad(
+        id=USER_ID,
+        tema=p.theme,
+        tamano_texto=p.text_size,
+        velocidad_voz=p.voice_speed,
+        velocidad_avatar=p.avatar_speed,
+        subtitulos=p.subtitles,
+        idioma=p.language,
+    )
+
+
+def _row_to_prefs(row: PreferenciaAccesibilidad) -> Preferences:
+    """
+    Convierte la fila a esquema. Si la BD trae un valor fuera del vocabulario
+    (edicion manual, migracion a medias), Pydantic lo rechazaria y tumbaria el
+    endpoint: en ese caso se cae a los valores por defecto.
+    """
+    try:
+        return Preferences(
+            theme=row.tema,  # type: ignore[arg-type]
+            text_size=row.tamano_texto,  # type: ignore[arg-type]
+            voice_speed=row.velocidad_voz,  # type: ignore[arg-type]
+            avatar_speed=row.velocidad_avatar,  # type: ignore[arg-type]
+            subtitles=row.subtitulos,
+            language=row.idioma,
+        )
+    except ValidationError:
+        return Preferences()
+
+
 def _group_phrases(phrases: list[QuickPhrase]) -> list[QuickPhraseGroup]:
     groups: list[QuickPhraseGroup] = []
     for cat in CATEGORY_ORDER:
@@ -83,6 +122,8 @@ def _group_phrases(phrases: list[QuickPhrase]) -> list[QuickPhraseGroup]:
 class Repository(Protocol):
     def get_profile(self) -> Profile: ...
     def update_profile(self, name: str, email: str) -> Profile: ...
+    def get_preferences(self) -> Preferences: ...
+    def update_preferences(self, data: Preferences) -> Preferences: ...
     def list_history(self, limit: int | None = None) -> list[HistoryEntry]: ...
     def add_history(self, data: HistoryEntryCreate) -> HistoryEntry: ...
     def delete_history(self, entry_id: str) -> bool: ...
@@ -99,6 +140,7 @@ class MemoryRepository:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._profile = _seed_profile()
+        self._preferences = Preferences()
         self._phrases = _seed_phrases()
         self._history: list[HistoryEntry] = []
         for direction, text in _seed_history():
@@ -120,6 +162,15 @@ class MemoryRepository:
         with self._lock:
             self._profile = Profile(name=name, email=email)
             return self._profile.model_copy()
+
+    def get_preferences(self) -> Preferences:
+        with self._lock:
+            return self._preferences.model_copy()
+
+    def update_preferences(self, data: Preferences) -> Preferences:
+        with self._lock:
+            self._preferences = data.model_copy()
+            return self._preferences.model_copy()
 
     def list_history(self, limit: int | None = None) -> list[HistoryEntry]:
         with self._lock:
@@ -188,6 +239,32 @@ class SqlRepository:
                 user.correo = email
             s.commit()
             return Profile(name=user.nombre, email=user.correo)
+
+    # ---- Preferencias ----
+    def get_preferences(self) -> Preferences:
+        with self._session() as s:
+            row = s.get(PreferenciaAccesibilidad, USER_ID)
+            if row is None:
+                defaults = Preferences()
+                s.add(_prefs_to_row(defaults))
+                s.commit()
+                return defaults
+            return _row_to_prefs(row)
+
+    def update_preferences(self, data: Preferences) -> Preferences:
+        with self._session() as s:
+            row = s.get(PreferenciaAccesibilidad, USER_ID)
+            if row is None:
+                s.add(_prefs_to_row(data))
+            else:
+                row.tema = data.theme
+                row.tamano_texto = data.text_size
+                row.velocidad_voz = data.voice_speed
+                row.velocidad_avatar = data.avatar_speed
+                row.subtitulos = data.subtitles
+                row.idioma = data.language
+            s.commit()
+            return data.model_copy()
 
     # ---- Historial ----
     def list_history(self, limit: int | None = None) -> list[HistoryEntry]:
@@ -267,6 +344,9 @@ def seed_database() -> None:
         if s.get(Usuario, USER_ID) is None:
             seed = _seed_profile()
             s.add(Usuario(id=USER_ID, nombre=seed.name, correo=seed.email))
+
+        if s.get(PreferenciaAccesibilidad, USER_ID) is None:
+            s.add(_prefs_to_row(Preferences()))
 
         if s.scalar(select(Frase).limit(1)) is None:
             for order, p in enumerate(_seed_phrases()):

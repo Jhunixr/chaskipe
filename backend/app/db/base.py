@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, create_engine
+from sqlalchemy import Boolean, DateTime, String, create_engine
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -37,6 +37,23 @@ class Usuario(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre: Mapped[str] = mapped_column(String(80))
     correo: Mapped[str] = mapped_column(String(255))
+
+
+class PreferenciaAccesibilidad(Base):
+    """
+    Preferencias de accesibilidad. Como `Usuario`, asume un unico usuario
+    (id fijo = 1) hasta que exista autenticacion.
+    """
+
+    __tablename__ = "preferencias_accesibilidad"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tema: Mapped[str] = mapped_column(String(10), default="sistema")
+    tamano_texto: Mapped[str] = mapped_column(String(12), default="normal")
+    velocidad_voz: Mapped[str] = mapped_column(String(10), default="normal")
+    velocidad_avatar: Mapped[str] = mapped_column(String(10), default="normal")
+    subtitulos: Mapped[bool] = mapped_column(Boolean, default=True)
+    idioma: Mapped[str] = mapped_column(String(10), default="es-PE")
 
 
 class Frase(Base):

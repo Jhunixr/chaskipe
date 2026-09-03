@@ -11,13 +11,16 @@ class Settings(BaseSettings):
     version: str = "0.8.0"  # FASE 8
     environment: str = "development"
 
-    # Origenes permitidos para CORS (el dev server de Vite).
+    # Origenes permitidos para CORS. Se usa una expresion regular porque Vite
+    # cambia de puerto solo cuando el 5173 esta ocupado, y con una lista fija
+    # el frontend se queda sin backend sin avisar.
     cors_origins: list[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "http://localhost:5174",  # si 5173 esta ocupado
         "http://localhost:4173",  # vite preview
     ]
+    # Cualquier puerto de localhost/127.0.0.1 en desarrollo.
+    cors_origin_regex: str = r"^http://(localhost|127\.0\.0\.1):\d+$"
 
     # Base de datos (FASE 8). Si esta vacia o no se puede conectar, la API
     # cae a persistencia EN MEMORIA y lo avisa en /health.
