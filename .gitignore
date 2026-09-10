@@ -88,3 +88,6 @@ avatar/exports/*
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Grabaciones apartadas por tener muy pocas muestras para entrenar.
+ai/data/pendientes/**/*.json
