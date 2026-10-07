@@ -3,9 +3,10 @@
 Aplicacion inclusiva para facilitar la comunicacion entre personas usuarias de
 **Lengua de Señas Peruana (LSP)** y personas oyentes.
 
-> **Estado actual: FASE 9 (avatar 3D basico con Three.js).**
-> El avatar no representa senas reales; el modelo de reconocimiento es de prueba.
-> Ver [Estado actual](#estado-actual).
+> **Estado actual: FASE 10 — reconocimiento del abecedario estatico de la LSP.**
+> "Senas a texto" deletrea con las 24 letras estaticas (92 % de acierto en
+> imagenes reservadas). Las senas con movimiento aun no tienen dataset real y
+> el avatar no representa senas reales. Ver [Estado actual](#estado-actual).
 
 ---
 
@@ -62,7 +63,7 @@ El dataset de IA vive en `ai/data/`, **no** en la base de datos.
 | Backend       | Python, FastAPI, SQLAlchemy, Alembic         |
 | IA            | Python, MediaPipe, TensorFlow/Keras (entreno) |
 | Base de datos | PostgreSQL 16 (Docker)                       |
-| Avatar        | Three.js (Blender + GLB en la FASE 10)       |
+| Avatar        | Three.js (Blender + GLB en la FASE 10b)       |
 | Control de versiones | Git                                  |
 | Gestor de paquetes   | npm, pip                             |
 
@@ -72,9 +73,9 @@ El dataset de IA vive en `ai/data/`, **no** en la base de datos.
 
 ```
 CHASKI PE/
-├── frontend/    # aplicacion React + TS + Vite (unica area desarrollada)
-├── backend/     # FastAPI — solo README por ahora
-├── ai/          # MediaPipe + modelo — solo estructura y README
+├── frontend/    # aplicacion React + TS + Vite
+├── backend/     # FastAPI + PostgreSQL (cuentas, historial, vocabulario, dataset)
+├── ai/          # scripts de dataset y entrenamiento (letras y senas)
 ├── avatar/      # Blender + Three.js — solo estructura y README
 ├── database/    # PostgreSQL — solo estructura y README
 ├── docs/        # documentacion del proyecto
@@ -108,6 +109,7 @@ Otros comandos:
 npm run build    # verificacion de tipos + build de produccion
 npm run preview  # servir el build
 npm run lint
+npm test         # paridad Python <-> TypeScript del modelo de letras
 ```
 
 ---
@@ -130,9 +132,13 @@ uvicorn app.main:app --reload
 ```
 
 - API: http://127.0.0.1:8000 · Docs: http://127.0.0.1:8000/docs
-- Persistencia en **PostgreSQL**. Sin Docker/BD el backend igual arranca
-  (persistencia en memoria); `GET /health` indica cual esta en uso.
+- Persistencia en **PostgreSQL** (Docker). En desarrollo, sin BD el backend
+  igual arranca (memoria); `GET /health` indica cual esta en uso. En
+  produccion (`CHASKIPE_ENVIRONMENT=production`) exige BD y `SECRET_KEY`.
 - Si no levantas el backend, el frontend usa datos de ejemplo.
+- **Desde el celular**: `npm run dev` sirve por HTTPS en la red local; pon
+  `VITE_API_URL=/backend` en `frontend/.env` para usar el proxy de Vite.
+- **Despliegue en Dokploy**: ver `backend/README.md`.
 
 ---
 
@@ -218,14 +224,56 @@ uvicorn app.main:app --reload
   (`React.lazy`): el chunk de Three.js solo se baja en esa pantalla.
 - El gesto **no representa ninguna sena real**; la pantalla lo avisa.
 
+**Autenticacion**
+
+- Cuentas reales (bcrypt + JWT), modo invitado y datos aislados por usuario.
+
+**FASE 10 — Abecedario de la LSP**
+
+- **Modelo de letras estaticas** (24 letras, sin J/Ñ/Z) entrenado con el
+  dataset publico *Static Hand Gestures of the Peruvian Sign Language
+  Alphabet* (CC BY-SA 4.0): 3575 manos extraidas con MediaPipe.
+  92 % de acierto en imagenes reservadas; M, N y Q son las mas debiles.
+- "Senas a texto" con modo **Abecedario** (deletreo letra por letra hasta
+  formar una palabra) y modo **Senas** (con movimiento).
+- Funciona con cualquier mano y con la camara frontal o trasera (mano
+  canonica); world landmarks de MediaPipe, independientes del video.
+- Pruebas de paridad Python ↔ TypeScript (`npm test`).
+- Ver `ai/README.md`.
+
+**Backend: vocabulario y dataset**
+
+- `GET /signs`: vocabulario LSP (33 entradas) como dato, con `validated`.
+- `POST /dataset/samples`: la herramienta `/dev/dataset` **envia las
+  grabaciones al servidor** desde el celular; `GET /dataset/export` las
+  descarga en zip para entrenar.
+- `POST /recognition/reports`: boton "No era esto" en el resultado.
+- Lista para Dokploy: acepta la URL `postgresql://` de Dokploy, falla al
+  arrancar en produccion sin BD o sin `SECRET_KEY`, registra en los logs
+  el motivo de un fallo de conexion.
+
+**Uso basico: conversacion y frases**
+
+- **Conversacion** cara a cara con un solo telefono: la persona sorda escribe,
+  toca frases sugeridas o **deletrea con la camara**, y la app lo lee en voz
+  alta; la persona oyente **habla al microfono** (dictado del navegador) y su
+  mensaje aparece en letra grande. Se guarda en el dispositivo y en el historial.
+- **Situaciones** con frases sugeridas para cada lado: General, Salud,
+  Transporte, Tienda, Tramites y Emergencia.
+- **51 frases rapidas** en 7 categorias (saludos, respuestas, necesidades,
+  salud, transporte, compras, emergencias con 105/106/116). Una base ya
+  desplegada recibe las nuevas al arrancar.
+- "Dictar respuesta" (Texto a senas) y "Mostrar en senas" (Frases) funcionan.
+- Corregido: con la camara encendida no se podia salir de la pantalla.
+
 ### **No** implementado todavia
 
-- **El modelo no reconoce senas reales** — entrenado con datos sinteticos de
-  prueba. La pantalla lo avisa.
+- **Senas con movimiento** (HOLA, GRACIAS, J, Ñ, Z...): falta grabar el
+  dataset real (`/dev/dataset` → Enviar al servidor) y entrenar.
 - **El avatar no representa senas** — gesto DEMO. GLB + animaciones LSP
-  validadas es la FASE 10.
-- Muestras reales del dataset.
-- Autenticacion real (login y registro son de demostracion); un unico usuario.
+  validadas es la FASE 10b.
+- Validacion del abecedario y de las senas con personas usuarias de LSP o
+  interpretes.
 - Conversion texto -> secuencia LSP.
 - Pose y rostro (MediaPipe) — solo manos por ahora.
 
@@ -246,6 +294,7 @@ han sido validadas con personas usuarias de LSP ni interpretes.
 | 6    | Integracion del modelo                      | Hecho (tiempo real) |
 | 7    | Backend FastAPI                             | Hecho       |
 | 8    | PostgreSQL                                  | Hecho       |
-| 9    | Avatar 3D                                   | **Actual** (basico, gesto DEMO) |
-| 10   | Animaciones LSP validadas                   | Pendiente   |
+| 9    | Avatar 3D                                   | Hecho (basico, gesto DEMO) |
+| 10   | Abecedario LSP (letras estaticas)           | **Actual** (92 %, falta validar con LSP) |
+| 10b  | Senas con movimiento + animaciones validadas | Pendiente   |
 | 11   | Integracion completa                        | Pendiente   |

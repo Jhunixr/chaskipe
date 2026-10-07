@@ -1,9 +1,11 @@
+import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 import { ROUTES } from '@/app/routes'
 import { Mascot } from '@/components/brand'
-import { Button, DemoBadge, Icon, PageHeader } from '@/components/ui'
+import { Button, Card, DemoBadge, Icon, PageHeader, TextInput } from '@/components/ui'
 import { useSpeech } from '@/hooks/useSpeech'
+import { reportRecognition } from '@/services/api'
 import {
   loadRecognition,
   type RecognitionResult,
@@ -20,9 +22,20 @@ export function TranslationResultPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { speak, speaking, cancel, supported } = useSpeech()
+  const [reporting, setReporting] = useState(false)
+  const [expected, setExpected] = useState('')
+  const [reportState, setReportState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle')
 
   const fromState = location.state as RecognitionResult | null
   const result = fromState ?? loadRecognition()
+  // "Decir en voz alta" (deletreo): se lee apenas se abre el resultado.
+  const autoSpeak = (location.state as { autoSpeak?: boolean } | null)?.autoSpeak === true
+  const spokenRef = useRef(false)
+  useEffect(() => {
+    if (!autoSpeak || !result || spokenRef.current) return
+    spokenRef.current = true
+    speak(result.text)
+  }, [autoSpeak, result, speak])
 
   if (!result) {
     return (
@@ -39,6 +52,18 @@ export function TranslationResultPage() {
   }
 
   const confidencePct = Math.round(result.confidence * 100)
+
+  // "No era esa sena": el aviso llega al equipo para mejorar el modelo.
+  const sendReport = async () => {
+    setReportState('sending')
+    const ok = await reportRecognition({
+      recognized: result.text,
+      expected: expected.trim(),
+      confidence: result.confidence,
+      modelVersion: result.label === 'DELETREO' ? 'letras-v1' : undefined,
+    })
+    setReportState(ok ? 'sent' : 'failed')
+  }
 
   return (
     <div className="page result">
@@ -97,9 +122,10 @@ export function TranslationResultPage() {
             variant="secondary"
             fullWidth
             icon="edit"
-            onClick={() => navigate(ROUTES.signToText)}
+            onClick={() => setReporting(true)}
+            disabled={reporting}
           >
-            Corregir
+            No era esto
           </Button>
           <Button
             variant="secondary"
@@ -111,6 +137,37 @@ export function TranslationResultPage() {
           </Button>
         </div>
       </div>
+
+      {reporting && (
+        <Card className="stack-sm">
+          {reportState === 'sent' ? (
+            <p className="text-sm">
+              Gracias. El aviso ayuda a mejorar el reconocimiento.
+            </p>
+          ) : (
+            <>
+              <TextInput
+                label="Que querias decir?"
+                value={expected}
+                onChange={setExpected}
+                placeholder="Por ejemplo: N"
+              />
+              {reportState === 'failed' && (
+                <p className="text-sm text-muted">
+                  No se pudo enviar el aviso. Revisa la conexion.
+                </p>
+              )}
+              <Button
+                icon="send"
+                onClick={() => void sendReport()}
+                disabled={reportState === 'sending'}
+              >
+                Enviar aviso
+              </Button>
+            </>
+          )}
+        </Card>
+      )}
 
       <div className="result__mascot" aria-hidden="true">
         <Mascot size={72} alt="" />

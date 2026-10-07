@@ -1,6 +1,7 @@
 # Base de datos — Chaski Pe
 
-> Estado: **FASE 8 — PostgreSQL en uso** (perfil, historial, frases).
+> Estado: **PostgreSQL 16 en Docker** (local: `docker compose`; produccion:
+> servicio `chaskipe-db` de Dokploy, tambien un contenedor Docker).
 > El esquema y las migraciones viven en `backend/` (SQLAlchemy + Alembic).
 
 ## Motor
@@ -15,8 +16,9 @@ React **no** se conecta directamente a PostgreSQL:
 React  →  FastAPI  →  PostgreSQL
 ```
 
-Si PostgreSQL no responde, el backend cae a persistencia **en memoria** y lo
-avisa en `/health` (`persistence: memory`).
+En desarrollo, si PostgreSQL no responde, el backend cae a persistencia
+**en memoria** y lo avisa en `/health` (`persistence: memory`). En produccion
+(`CHASKIPE_ENVIRONMENT=production`) no arranca sin base de datos.
 
 ## Levantar / detener
 
@@ -31,6 +33,7 @@ Datos de conexion (por defecto):
 `postgresql+psycopg://chaskipe:chaskipe@localhost:5432/chaskipe`
 
 Se puede cambiar con `CHASKIPE_DATABASE_URL` (variable de entorno del backend).
+Acepta tambien el formato `postgresql://...` que muestra Dokploy.
 
 ## Esquema y migraciones
 
@@ -48,19 +51,19 @@ alembic downgrade -1                        # revertir la ultima
 > Al arrancar, el backend tambien hace `create_all()` (crea las tablas que
 > falten). Alembic es el metodo recomendado para cambios de esquema.
 
-## Entidades (FASE 8)
+## Entidades
 
-| Tabla                  | Contenido |
-| ---------------------- | --------- |
-| `usuarios`             | Perfil (nombre, correo). Un unico usuario (id=1) por ahora. |
-| `frases`               | Frases rapidas por categoria. `es_demo=true` (senas no validadas). |
-| `historial_traduccion` | Traducciones: direccion, texto, fecha, `es_demo`. |
-| `alembic_version`      | Control de versiones de Alembic. |
-
-### Entidades futuras (aun no creadas)
-
-`preferencias_usuario`, `senas`, `frase_sena`, `animaciones_sena` — se anaden
-cuando haya avatar y modelo de IA con senas validadas.
+| Tabla                        | Contenido |
+| ---------------------------- | --------- |
+| `usuarios`                   | Cuentas (nombre, correo, contrasena hasheada). |
+| `preferencias_accesibilidad` | Preferencias por usuario. |
+| `frases`                     | Frases rapidas por categoria. `es_demo=true` (senas no validadas). |
+| `historial_traduccion`       | Traducciones por usuario: direccion, texto, fecha, `es_demo`. |
+| `senas`                      | Vocabulario LSP (33 al sembrar: palabras, frases, abecedario). `validada` solo tras revision con LSP. |
+| `muestras_sena`              | Registro de grabaciones subidas (el archivo con los landmarks vive en disco). |
+| `modelos_reconocimiento`     | Versiones de modelos y su exactitud (`letras-v1`). |
+| `reportes_reconocimiento`    | Avisos "No era esa sena" enviados desde la app. |
+| `alembic_version`            | Control de versiones de Alembic. |
 
 ## Consideraciones importantes
 
