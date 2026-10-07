@@ -252,6 +252,20 @@ uvicorn app.main:app --reload
   arrancar en produccion sin BD o sin `SECRET_KEY`, registra en los logs
   el motivo de un fallo de conexion.
 
+**Uso basico: conversacion y frases**
+
+- **Conversacion** cara a cara con un solo telefono: la persona sorda escribe,
+  toca frases sugeridas o **deletrea con la camara**, y la app lo lee en voz
+  alta; la persona oyente **habla al microfono** (dictado del navegador) y su
+  mensaje aparece en letra grande. Se guarda en el dispositivo y en el historial.
+- **Situaciones** con frases sugeridas para cada lado: General, Salud,
+  Transporte, Tienda, Tramites y Emergencia.
+- **51 frases rapidas** en 7 categorias (saludos, respuestas, necesidades,
+  salud, transporte, compras, emergencias con 105/106/116). Una base ya
+  desplegada recibe las nuevas al arrancar.
+- "Dictar respuesta" (Texto a senas) y "Mostrar en senas" (Frases) funcionan.
+- Corregido: con la camara encendida no se podia salir de la pantalla.
+
 ### **No** implementado todavia
 
 - **Senas con movimiento** (HOLA, GRACIAS, J, Ñ, Z...): falta grabar el
