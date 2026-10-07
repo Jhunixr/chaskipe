@@ -51,7 +51,10 @@ PostgreSQL. La API se despliega con el `Dockerfile` de esta carpeta: al
 arrancar aplica las migraciones (`start.sh`) y luego levanta uvicorn como
 usuario sin privilegios.
 
-1. **Aplicacion** → Build type *Dockerfile*, ruta `backend/`.
+1. **Aplicacion** → Build type *Dockerfile*. Hoy se despliega desde el repo
+   `Jhunixr/chaskipe-backend`, rama `backend-python`, Build Path `/`
+   (copia de la carpeta `backend/` del monorepo `chaskipe`).
+   **Autodeploy esta activo**: cada push a `backend-python` redespliega.
 2. **Environment** (ver `.env.example`):
 
    ```env
